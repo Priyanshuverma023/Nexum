@@ -6,14 +6,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@corsair-dev/github": "^0.1.18",
     "@corsair-dev/gmail": "^0.1.5",
     "@corsair-dev/googlecalendar": "^0.1.6",
     "corsair": "^0.1.120",
-    "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "next": "16.3.3",
     "pg": "^8.23.0",
@@ -26,6 +28,8 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
     "tailwindcss": "^4",
