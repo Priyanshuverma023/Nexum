@@ -12,6 +12,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@corsair-dev/cli": "^0.1.20",
     "@corsair-dev/github": "^0.1.18",
     "@corsair-dev/gmail": "^0.1.5",
     "@corsair-dev/googlecalendar": "^0.1.6",
