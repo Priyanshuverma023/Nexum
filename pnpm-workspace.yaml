@@ -1,5 +1,7 @@
 allowBuilds:
+  '@google/genai': false
   corsair: false
   esbuild: false
+  protobufjs: false
   sharp: false
   unrs-resolver: false

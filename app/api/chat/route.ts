@@ -1,9 +1,10 @@
 import { db } from '@/lib/db';
-import { chatMessages } from '@/lib/schema';
+import { chatMessages, actionsLog } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { parseIntent } from '@/lib/ai';
 
-const userId = 'demo-user'; // placeholder until real auth/session wiring
+const userId = 'demo-user';
 
 export async function GET() {
   const messages = await db
@@ -16,27 +17,37 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const { content } = await req.json();
+  try {
+    const { content } = await req.json();
 
-  if (!content || typeof content !== 'string') {
-    return NextResponse.json({ error: 'content is required' }, { status: 400 });
+    if (!content || typeof content !== 'string') {
+      return NextResponse.json({ error: 'content is required' }, { status: 400 });
+    }
+
+    await db.insert(chatMessages).values({ userId, role: 'user', content });
+
+    const intent = await parseIntent(content);
+
+    await db.insert(actionsLog).values({
+      userId,
+      actionType: intent.action,
+      status: 'parsed',
+      details: intent,
+    });
+
+    const reply =
+      intent.action === 'unclear'
+        ? intent.clarificationNeeded || "I couldn't quite understand that — can you rephrase?"
+        : `Got it — I'll ${intent.action.replace('_', ' ')}${intent.recipient ? ` for ${intent.recipient}` : ''}. (Execution coming next.)`;
+
+    await db.insert(chatMessages).values({ userId, role: 'assistant', content: reply });
+
+    return NextResponse.json({ reply, intent });
+  } catch (err) {
+    console.error('Chat route failed:', err);
+    return NextResponse.json(
+      { error: 'Something went wrong', details: String(err) },
+      { status: 500 }
+    );
   }
-
-  // Save the user's message
-  await db.insert(chatMessages).values({
-    userId,
-    role: 'user',
-    content,
-  });
-
-  // Placeholder assistant response — we'll replace this with real AI parsing next
-  const reply = `Got it — you said: "${content}". (AI parsing coming next.)`;
-
-  await db.insert(chatMessages).values({
-    userId,
-    role: 'assistant',
-    content: reply,
-  });
-
-  return NextResponse.json({ reply });
 }

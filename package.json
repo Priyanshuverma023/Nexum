@@ -16,9 +16,11 @@
     "@corsair-dev/github": "^0.1.18",
     "@corsair-dev/gmail": "^0.1.5",
     "@corsair-dev/googlecalendar": "^0.1.6",
+    "@google/genai": "^2.21.0",
     "corsair": "^0.1.120",
     "drizzle-orm": "^0.45.2",
     "next": "16.3.3",
+    "openai": "^7.9.0",
     "pg": "^8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"
