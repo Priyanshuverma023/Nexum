@@ -1,4 +1,4 @@
-import { corsair } from './corsair';
+import { getCorsair } from './corsair';
 import type { ParsedIntent } from './ai';
 import * as chrono from 'chrono-node';
 
@@ -43,7 +43,7 @@ function resolveEventTime(eventTime: string | undefined): {
 }
 
 export async function executeIntent(intent: ParsedIntent, tenantId: string) {
-  const client = corsair.withTenant(tenantId);
+  const client = getCorsair().withTenant(tenantId);
   const results: {
     emailSent?: boolean;
     eventCreated?: boolean;

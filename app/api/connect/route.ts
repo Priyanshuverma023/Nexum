@@ -1,10 +1,10 @@
-import { corsair } from '@/lib/corsair';
+import { getCorsair } from '@/lib/corsair';
 import { NextResponse } from 'next/server';
 
 export async function GET(req: Request) {
   try {
     const tenantId = 'default';
-    const { connectUrl } = await corsair.manage.connect.createLink({
+    const { connectUrl } = await getCorsair().manage.connect.createLink({
       plugin: 'gmail',
       tenantId,
     });
