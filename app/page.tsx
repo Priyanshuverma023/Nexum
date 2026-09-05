@@ -49,11 +49,31 @@ export default function Home() {
   }
 
   return (
-    <main className='flex h-screen flex-col bg-[#0a0a0a] text-zinc-100'>
+    <main className='flex h-[100dvh] flex-col overflow-hidden bg-[#0a0a0a] text-zinc-100'>
       {/* Header */}
       <header className='flex items-center gap-3 border-b border-zinc-800 px-6 py-4'>
-        <div className='flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 font-bold text-sm'>
-          N
+        <div className='h-8 w-8 shrink-0'>
+          <svg viewBox='0 0 76 76' className='h-full w-full'>
+            <rect x='0' y='0' width='76' height='76' rx='16' fill='#6366f1' />
+            <rect x='16' y='16' width='48' height='8' rx='4' fill='#e0e7ff' />
+            <rect x='16' y='32' width='32' height='8' rx='4' fill='#e0e7ff' />
+            <circle
+              cx='60'
+              cy='58'
+              r='16'
+              fill='#8b5cf6'
+              stroke='#0a0a0a'
+              strokeWidth='3'
+            />
+            <path
+              d='M53 58 L58 63 L68 52'
+              fill='none'
+              stroke='#faf5ff'
+              strokeWidth='4'
+              strokeLinecap='round'
+              strokeLinejoin='round'
+            />
+          </svg>
         </div>
         <div>
           <h1 className='text-sm font-semibold leading-none'>Nexum</h1>
@@ -66,7 +86,7 @@ export default function Home() {
       </header>
 
       {/* Messages */}
-      <div className='flex-1 overflow-y-auto px-6 py-6'>
+      <div className='min-h-0 flex-1 overflow-y-auto px-6 py-6'>
         <div className='mx-auto flex max-w-2xl flex-col gap-4'>
           {messages.length === 0 && !loading && (
             <div className='mt-24 text-center text-zinc-500'>
@@ -128,6 +148,8 @@ export default function Home() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
             placeholder='Schedule a meeting, send an email, or ask about your inbox...'
+            autoComplete='off'
+            name='nexum-chat-input'
             className='flex-1 bg-transparent px-3 py-2 text-sm outline-none placeholder:text-zinc-600'
           />
           <button
