@@ -1,5 +1,6 @@
 import { corsair } from './corsair';
 import type { ParsedIntent } from './ai';
+import * as chrono from 'chrono-node';
 
 function buildRawEmail(to: string, subject: string, body: string): string {
   const message = [
@@ -11,7 +12,6 @@ function buildRawEmail(to: string, subject: string, body: string): string {
     body,
   ].join('\r\n');
 
-  // Gmail requires base64url encoding (URL-safe base64, no padding)
   return Buffer.from(message)
     .toString('base64')
     .replace(/\+/g, '-')
@@ -19,36 +19,65 @@ function buildRawEmail(to: string, subject: string, body: string): string {
     .replace(/=+$/, '');
 }
 
+function resolveEventTime(eventTime: string | undefined): {
+  start: Date;
+  end: Date;
+} {
+  const now = new Date();
+  console.log('[resolveEventTime] input eventTime:', JSON.stringify(eventTime));
+
+  if (eventTime && eventTime.trim()) {
+    const parsed = chrono.parseDate(eventTime, now);
+    console.log('[resolveEventTime] chrono parsed:', parsed);
+    if (parsed) {
+      const end = new Date(parsed.getTime() + 30 * 60 * 1000);
+      return { start: parsed, end };
+    }
+  }
+
+  console.log('[resolveEventTime] falling back to next-hour default');
+  const start = new Date(now);
+  start.setHours(start.getHours() + 1, 0, 0, 0);
+  const end = new Date(start.getTime() + 30 * 60 * 1000);
+  return { start, end };
+}
+
 export async function executeIntent(intent: ParsedIntent, tenantId: string) {
   const client = corsair.withTenant(tenantId);
-  const results: { emailSent?: boolean; eventCreated?: boolean; error?: string } = {};
+  const results: {
+    emailSent?: boolean;
+    eventCreated?: boolean;
+    error?: string;
+    scheduledFor?: string;
+  } = {};
 
   try {
     if (intent.action === 'send_email' || intent.action === 'both') {
       const raw = buildRawEmail(
         intent.recipient || '',
         intent.subject || '(no subject)',
-        intent.emailBody || ''
+        intent.emailBody || '',
       );
-
       await client.gmail.api.messages.send({ raw });
       results.emailSent = true;
     }
 
-   if (intent.action === 'schedule_event' || intent.action === 'both') {
-  const startTime = new Date(); // placeholder — real time parsing comes next
-  startTime.setHours(startTime.getHours() + 1, 0, 0, 0); // default: next hour
-  const endTime = new Date(startTime.getTime() + 30 * 60 * 1000); // 30 min duration
+    if (intent.action === 'schedule_event' || intent.action === 'both') {
+      const { start, end } = resolveEventTime(intent.eventTime);
 
-  await client.googlecalendar.api.events.create({
-    event: {
-      summary: intent.eventTitle || 'New event',
-      start: { dateTime: startTime.toISOString() },
-      end: { dateTime: endTime.toISOString() },
-    },
-  });
-  results.eventCreated = true;
-}
+      await client.googlecalendar.api.events.create({
+        event: {
+          summary: intent.eventTitle || 'New event',
+          start: { dateTime: start.toISOString() },
+          end: { dateTime: end.toISOString() },
+        },
+      });
+      results.eventCreated = true;
+      results.scheduledFor = start.toLocaleString('en-IN', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      });
+    }
   } catch (err) {
     console.error('Execution failed:', err);
     results.error = String(err);

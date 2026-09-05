@@ -22,7 +22,10 @@ export async function POST(req: Request) {
     const { content } = await req.json();
 
     if (!content || typeof content !== 'string') {
-      return NextResponse.json({ error: 'content is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'content is required' },
+        { status: 400 },
+      );
     }
 
     await db.insert(chatMessages).values({ userId, role: 'user', content });
@@ -32,7 +35,9 @@ export async function POST(req: Request) {
     let reply: string;
 
     if (intent.action === 'unclear') {
-      reply = intent.clarificationNeeded || "I couldn't quite understand that — can you rephrase?";
+      reply =
+        intent.clarificationNeeded ||
+        "I couldn't quite understand that — can you rephrase?";
       await db.insert(actionsLog).values({
         userId,
         actionType: 'unclear',
@@ -51,14 +56,19 @@ export async function POST(req: Request) {
 
       reply = execResult.error
         ? `I tried to ${intent.action.replace('_', ' ')} but hit an error: ${execResult.error}`
-        : `Done — ${intent.action === 'both' ? 'scheduled the event and sent the email' : intent.action.replace('_', ' ')}${intent.recipient ? ` for ${intent.recipient}` : ''}.`;
+        : `Done — ${intent.action === 'both' ? 'scheduled the event and sent the email' : intent.action.replace('_', ' ')}${intent.recipient ? ` for ${intent.recipient}` : ''}${execResult.scheduledFor ? ` (${execResult.scheduledFor})` : ''}.`;
     }
 
-    await db.insert(chatMessages).values({ userId, role: 'assistant', content: reply });
+    await db
+      .insert(chatMessages)
+      .values({ userId, role: 'assistant', content: reply });
 
     return NextResponse.json({ reply, intent });
   } catch (err) {
     console.error('Chat route failed:', err);
-    return NextResponse.json({ error: 'Something went wrong', details: String(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Something went wrong', details: String(err) },
+      { status: 500 },
+    );
   }
 }
