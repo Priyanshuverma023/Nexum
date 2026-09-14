@@ -2,13 +2,48 @@ import { db } from '@/lib/db';
 import { chatMessages, actionsLog } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { randomUUID } from 'crypto';
 import { parseIntent } from '@/lib/ai';
 import { executeIntent } from '@/lib/execute';
 
-const userId = 'default';
+const USER_ID_COOKIE = 'nexum_user_id';
+
+async function getUserId(): Promise<{
+  userId: string;
+  isNew: boolean;
+}> {
+  const cookieStore = await cookies();
+
+  const existingUserId = cookieStore.get(USER_ID_COOKIE)?.value;
+
+  if (existingUserId) {
+    return {
+      userId: existingUserId,
+      isNew: false,
+    };
+  }
+
+  const userId = randomUUID();
+
+  cookieStore.set(USER_ID_COOKIE, userId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 60 * 60 * 24 * 365,
+  });
+
+  return {
+    userId,
+    isNew: true,
+  };
+}
 
 export async function GET() {
   try {
+    const { userId } = await getUserId();
+
     const messages = await db
       .select()
       .from(chatMessages)
@@ -20,26 +55,53 @@ export async function GET() {
     console.error('Failed to load chat:', err);
 
     return NextResponse.json(
-      { error: 'Failed to load chat messages' },
-      { status: 500 },
+      {
+        error: 'Failed to load chat messages',
+      },
+      {
+        status: 500,
+      },
     );
   }
 }
 
 export async function POST(req: Request) {
   try {
-    const { content } = await req.json();
+    const { userId } = await getUserId();
+
+    const body = await req.json();
+    const content = body?.content;
 
     if (!content || typeof content !== 'string') {
       return NextResponse.json(
-        { error: 'content is required' },
-        { status: 400 },
+        {
+          error: 'content is required',
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    const trimmedContent = content.trim();
+
+    if (!trimmedContent) {
+      return NextResponse.json(
+        {
+          error: 'content cannot be empty',
+        },
+        {
+          status: 400,
+        },
       );
     }
 
     /*
-     * Get previous conversation BEFORE inserting the current message.
-     * This prevents the current message from being duplicated in context.
+     * Get this user's previous conversation.
+     *
+     * IMPORTANT:
+     * We use the browser-specific userId, so users no longer
+     * share the same conversation history.
      */
     const previousMessages = await db
       .select({
@@ -50,24 +112,47 @@ export async function POST(req: Request) {
       .where(eq(chatMessages.userId, userId))
       .orderBy(chatMessages.createdAt);
 
+    /*
+     * Store the current user message.
+     */
     await db.insert(chatMessages).values({
       userId,
       role: 'user',
-      content,
+      content: trimmedContent,
     });
 
+    /*
+     * Give Gemini the previous conversation so it can understand
+     * follow-up messages.
+     *
+     * Example:
+     *
+     * User:
+     * "Schedule a meeting with Ayush tomorrow and email him."
+     *
+     * Assistant:
+     * "What's his email address?"
+     *
+     * User:
+     * "ayush@gmail.com"
+     *
+     * Gemini can now understand that the email address belongs
+     * to the previous request.
+     */
     const intent = await parseIntent(
-      content,
+      trimmedContent,
       previousMessages.map((message) => ({
-        ...message,
-        role: message.role as 'assistant' | 'user',
+        role: message.role as 'user' | 'assistant',
+        content: message.content,
       })),
     );
 
     let reply: string;
 
     /*
-     * Handle unclear/missing information.
+     * ---------------------------------------------------------
+     * UNCLEAR / CLARIFICATION
+     * ---------------------------------------------------------
      */
     if (intent.action === 'unclear') {
       reply =
@@ -82,13 +167,18 @@ export async function POST(req: Request) {
       });
     } else {
       /*
-       * Validate required information BEFORE executing anything.
+       * ---------------------------------------------------------
+       * VALIDATE REQUIRED INFORMATION
+       * ---------------------------------------------------------
        */
       const missingFields: string[] = [];
 
+      /*
+       * Email requirements
+       */
       if (
         (intent.action === 'send_email' || intent.action === 'both') &&
-        !intent.recipient
+        !intent.recipient?.trim()
       ) {
         missingFields.push('email address');
       }
@@ -100,6 +190,9 @@ export async function POST(req: Request) {
         missingFields.push('email content');
       }
 
+      /*
+       * Calendar requirements
+       */
       if (
         (intent.action === 'schedule_event' || intent.action === 'both') &&
         !intent.eventTime?.trim()
@@ -107,10 +200,17 @@ export async function POST(req: Request) {
         missingFields.push('meeting time');
       }
 
+      /*
+       * If information is missing, DO NOT execute anything.
+       */
       if (missingFields.length > 0) {
-        reply = `I need the ${missingFields.join(
-          ' and ',
-        )} before I can complete that request.`;
+        if (missingFields.length === 1) {
+          reply = `I need the ${missingFields[0]} before I can complete that request.`;
+        } else {
+          reply = `I need the ${missingFields.join(
+            ' and ',
+          )} before I can complete that request.`;
+        }
 
         await db.insert(actionsLog).values({
           userId,
@@ -122,6 +222,19 @@ export async function POST(req: Request) {
           },
         });
       } else {
+        /*
+         * -------------------------------------------------------
+         * EXECUTE INTENT
+         * -------------------------------------------------------
+         *
+         * IMPORTANT:
+         * userId is also used as the Corsair tenant ID.
+         *
+         * Therefore:
+         *
+         * Browser A → tenant A → Gmail A / Calendar A
+         * Browser B → tenant B → Gmail B / Calendar B
+         */
         const execResult = await executeIntent(intent, userId);
 
         await db.insert(actionsLog).values({
@@ -134,10 +247,12 @@ export async function POST(req: Request) {
           },
         });
 
+        /*
+         * -------------------------------------------------------
+         * EXECUTION ERROR / PARTIAL SUCCESS
+         * -------------------------------------------------------
+         */
         if (execResult.error) {
-          /*
-           * Give a useful response for partial execution.
-           */
           if (execResult.emailSent && !execResult.eventCreated) {
             reply = `The email was sent successfully, but I couldn't create the calendar event: ${execResult.error}`;
           } else if (execResult.eventCreated && !execResult.emailSent) {
@@ -146,6 +261,11 @@ export async function POST(req: Request) {
             reply = `I couldn't complete that request: ${execResult.error}`;
           }
         } else {
+          /*
+           * -----------------------------------------------------
+           * SUCCESS RESPONSES
+           * -----------------------------------------------------
+           */
           if (intent.action === 'both') {
             reply = `Done — I scheduled "${intent.eventTitle || 'the meeting'}" for ${execResult.scheduledFor} and sent the email to ${intent.recipient}.`;
           } else if (intent.action === 'schedule_event') {
@@ -161,6 +281,9 @@ export async function POST(req: Request) {
       }
     }
 
+    /*
+     * Store assistant response for THIS user only.
+     */
     await db.insert(chatMessages).values({
       userId,
       role: 'assistant',
@@ -179,7 +302,9 @@ export async function POST(req: Request) {
         error: 'Something went wrong',
         details: err instanceof Error ? err.message : String(err),
       },
-      { status: 500 },
+      {
+        status: 500,
+      },
     );
   }
 }
