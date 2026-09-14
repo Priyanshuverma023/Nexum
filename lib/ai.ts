@@ -1,9 +1,21 @@
 import { GoogleGenAI } from '@google/genai';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const apiKey = process.env.GEMINI_API_KEY;
+
+if (!apiKey) {
+  throw new Error('Missing GEMINI_API_KEY environment variable');
+}
+
+const ai = new GoogleGenAI({ apiKey });
+
+export type ConversationMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
 
 export type ParsedIntent = {
   action: 'send_email' | 'schedule_event' | 'both' | 'read_email' | 'unclear';
+
   recipient?: string;
   subject?: string;
   emailBody?: string;
@@ -12,42 +24,153 @@ export type ParsedIntent = {
   clarificationNeeded?: string;
 };
 
-const SYSTEM_PROMPT = `You are an intent parser for an AI email/calendar assistant called Nexum.
-Given a user's natural language request, extract structured intent as JSON only.
+const SYSTEM_PROMPT = `
+You are the intent parser for Nexum, an AI email and calendar assistant.
 
-IMPORTANT RULES:
-1. If the action requires sending an email (send_email or both) and the user only gave a name (not a full email address like "name@domain.com"), set action to "unclear" and ask for the email address in clarificationNeeded. Do NOT guess or invent an email address.
-2. ALWAYS extract any time/date phrase the user mentions (e.g. "tomorrow at 3pm", "next Monday", "in 2 hours") into eventTime EXACTLY as the user said it, word for word. Do NOT leave eventTime empty if the user mentioned any time reference, even a vague one like "tomorrow" or "this evening".
-3. If no time is mentioned at all, leave eventTime as an empty string.
+Your job is to understand the user's CURRENT request using the previous conversation as context.
+
+Return JSON only.
 
 Schema:
 {
   "action": "send_email" | "schedule_event" | "both" | "read_email" | "unclear",
-  "recipient": string,
-  "subject": string,
-  "emailBody": string,
-  "eventTitle": string,
-  "eventTime": string,
-  "clarificationNeeded": string
+  "recipient": "",
+  "subject": "",
+  "emailBody": "",
+  "eventTitle": "",
+  "eventTime": "",
+  "clarificationNeeded": ""
 }
 
+IMPORTANT RULES:
+
+1. CONVERSATION CONTEXT
+Use previous messages to understand follow-up responses.
+
+Example:
+
+Previous user:
+"Schedule a meeting with Ayush tomorrow and email him."
+
+Assistant:
+"I need Ayush's email address and a meeting time."
+
+Current user:
+"ayush@gmail.com, 3 PM"
+
+The result MUST combine the information:
+
+{
+  "action": "both",
+  "recipient": "ayush@gmail.com",
+  "eventTitle": "Meeting with Ayush",
+  "eventTime": "tomorrow at 3 PM"
+}
+
+Do NOT treat the current message as an isolated request.
+
+2. EMAIL RECIPIENT
+If an email address is provided, use it exactly.
+
+Never invent an email address.
+
+If an email action requires a recipient and no email address is available from the current message or previous conversation, return "unclear".
+
+3. EMAIL BODY
+If the user explicitly provides email content, use it.
+
+For example:
+"email him let's catch up"
+
+emailBody should be:
+"Let's catch up."
+
+If the user wants to send an email but provides no meaningful email content, return "unclear" and ask what they want the email to say.
+
+4. EVENT TIME
+Extract every date/time phrase exactly from the user's request.
+
 Examples:
-"schedule meet with Ayush tomorrow at 3pm and also email ayush@gmail.com let's catch up" →
-{"action":"both","recipient":"ayush@gmail.com","subject":"Let's catch up","emailBody":"Hi Ayush, would love to catch up — I've scheduled some time for us to meet.","eventTitle":"Catch up with Ayush","eventTime":"tomorrow at 3pm"}
+"tomorrow at 3pm" → "tomorrow at 3pm"
+"next Monday" → "next Monday"
+"tomorrow evening" → "tomorrow evening"
+"in 2 hours" → "in 2 hours"
 
-"schedule meet with Ayush and also email him let's catch up" (no email address given) →
-{"action":"unclear","recipient":"Ayush","subject":"","emailBody":"","eventTitle":"","eventTime":"","clarificationNeeded":"I can schedule the meeting, but I need Ayush's email address to send the invite email. What's his email?"}
+NEVER invent a time.
 
-"tell me today's emails" →
-{"action":"read_email","recipient":"","subject":"","emailBody":"","eventTitle":"","eventTime":""}
+If a meeting is requested but NO time is provided, return "unclear" and ask for the meeting time.
 
-"schedule a meeting with Priyanshu next Monday" (calendar-only, no email needed) →
-{"action":"schedule_event","recipient":"Priya","subject":"","emailBody":"","eventTitle":"Meeting with Priya","eventTime":"next Monday"}`;
+Do NOT use a default time.
 
-export async function parseIntent(userMessage: string): Promise<ParsedIntent> {
+5. EVENT TITLE
+Create a useful title from the request.
+
+"schedule a meeting with Ayush" →
+"Meeting with Ayush"
+
+Do not incorrectly change people's names.
+
+6. ACTION
+Use:
+
+"send_email" → only email
+"schedule_event" → only calendar event
+"both" → email + calendar event
+"read_email" → user asks about inbox/emails
+"unclear" → required information is missing or request is ambiguous
+
+7. IMPORTANT
+If the user is answering a previous clarification question, combine their answer with the previous request.
+
+Example:
+
+Previous:
+"I can schedule the meeting, but I need the email address."
+
+Current:
+"priyanshu@example.com"
+
+This is NOT an unclear request.
+
+It should produce the previously requested action with:
+recipient = "priyanshu@example.com"
+
+8. Do not execute anything yourself. Only return structured JSON.
+`;
+
+export async function parseIntent(
+  userMessage: string,
+  conversation: ConversationMessage[] = [],
+): Promise<ParsedIntent> {
+  const conversationText =
+    conversation.length > 0
+      ? conversation
+          .map(
+            (message) =>
+              `${message.role === 'user' ? 'User' : 'Assistant'}: ${message.content}`,
+          )
+          .join('\n')
+      : '(No previous conversation)';
+
+  const prompt = `
+PREVIOUS CONVERSATION:
+${conversationText}
+
+CURRENT USER MESSAGE:
+${userMessage}
+
+Now determine the complete intent using the previous conversation and the current message.
+Return JSON only.
+`;
+
   const response = await ai.models.generateContent({
     model: 'gemini-3.6-flash',
-    contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: prompt }],
+      },
+    ],
     config: {
       systemInstruction: SYSTEM_PROMPT,
       responseMimeType: 'application/json',
@@ -55,5 +178,14 @@ export async function parseIntent(userMessage: string): Promise<ParsedIntent> {
   });
 
   const raw = response.text ?? '{}';
-  return JSON.parse(raw) as ParsedIntent;
+
+  try {
+    return JSON.parse(raw) as ParsedIntent;
+  } catch {
+    return {
+      action: 'unclear',
+      clarificationNeeded:
+        "I couldn't understand that request. Could you rephrase it?",
+    };
+  }
 }

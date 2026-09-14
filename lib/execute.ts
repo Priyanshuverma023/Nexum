@@ -19,27 +19,32 @@ function buildRawEmail(to: string, subject: string, body: string): string {
     .replace(/=+$/, '');
 }
 
-function resolveEventTime(eventTime: string | undefined): {
+function resolveEventTime(eventTime: string): {
   start: Date;
   end: Date;
-} {
-  const now = new Date();
-  console.log('[resolveEventTime] input eventTime:', JSON.stringify(eventTime));
-
-  if (eventTime && eventTime.trim()) {
-    const parsed = chrono.parseDate(eventTime, now);
-    console.log('[resolveEventTime] chrono parsed:', parsed);
-    if (parsed) {
-      const end = new Date(parsed.getTime() + 30 * 60 * 1000);
-      return { start: parsed, end };
-    }
+} | null {
+  if (!eventTime?.trim()) {
+    return null;
   }
 
-  console.log('[resolveEventTime] falling back to next-hour default');
-  const start = new Date(now);
-  start.setHours(start.getHours() + 1, 0, 0, 0);
-  const end = new Date(start.getTime() + 30 * 60 * 1000);
-  return { start, end };
+  const now = new Date();
+
+  console.log('[resolveEventTime] input eventTime:', JSON.stringify(eventTime));
+
+  const parsed = chrono.parseDate(eventTime, now);
+
+  console.log('[resolveEventTime] chrono parsed:', parsed);
+
+  if (!parsed) {
+    return null;
+  }
+
+  const end = new Date(parsed.getTime() + 30 * 60 * 1000);
+
+  return {
+    start: parsed,
+    end,
+  };
 }
 
 export async function executeIntent(intent: ParsedIntent, tenantId: string) {
@@ -54,10 +59,20 @@ export async function executeIntent(intent: ParsedIntent, tenantId: string) {
     const client = getCorsair().withTenant(tenantId);
 
     if (intent.action === 'send_email' || intent.action === 'both') {
+      if (!intent.recipient) {
+        results.error = 'An email address is required.';
+        return results;
+      }
+
+      if (!intent.emailBody?.trim()) {
+        results.error = 'Email content is required.';
+        return results;
+      }
+
       const raw = buildRawEmail(
-        intent.recipient || '',
+        intent.recipient,
         intent.subject || '(no subject)',
-        intent.emailBody || '',
+        intent.emailBody,
       );
 
       await client.gmail.api.messages.send({ raw });
@@ -66,7 +81,19 @@ export async function executeIntent(intent: ParsedIntent, tenantId: string) {
     }
 
     if (intent.action === 'schedule_event' || intent.action === 'both') {
-      const { start, end } = resolveEventTime(intent.eventTime);
+      if (!intent.eventTime?.trim()) {
+        results.error = 'A meeting time is required.';
+        return results;
+      }
+
+      const resolved = resolveEventTime(intent.eventTime);
+
+      if (!resolved) {
+        results.error = `I couldn't understand the meeting time "${intent.eventTime}".`;
+        return results;
+      }
+
+      const { start, end } = resolved;
 
       await client.googlecalendar.api.events.create({
         event: {
@@ -89,6 +116,7 @@ export async function executeIntent(intent: ParsedIntent, tenantId: string) {
     }
   } catch (err) {
     console.error('Execution failed:', err);
+
     results.error = err instanceof Error ? err.message : String(err);
   }
 

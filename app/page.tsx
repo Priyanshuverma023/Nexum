@@ -24,29 +24,66 @@ export default function Home() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
 
-  async function sendMessage() {
-    if (!input.trim() || loading) return;
-    const userMsg: Message = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: input,
-    };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput('');
-    setLoading(true);
+ async function sendMessage() {
+  if (!input.trim() || loading) return;
 
+  const userMsg: Message = {
+    id: crypto.randomUUID(),
+    role: 'user',
+    content: input.trim(),
+  };
+
+  setMessages((prev) => [...prev, userMsg]);
+  setInput('');
+  setLoading(true);
+
+  try {
     const res = await fetch('/api/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: userMsg.content }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        content: userMsg.content,
+      }),
     });
+
     const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(
+        data?.error || 'Something went wrong. Please try again.',
+      );
+    }
+
     setMessages((prev) => [
       ...prev,
-      { id: crypto.randomUUID(), role: 'assistant', content: data.reply },
+      {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content:
+          data.reply ||
+          "I couldn't generate a response. Please try again.",
+      },
     ]);
+  } catch (error) {
+    console.error('Chat request failed:', error);
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content:
+          error instanceof Error
+            ? error.message
+            : 'Something went wrong. Please try again.',
+      },
+    ]);
+  } finally {
     setLoading(false);
   }
+}
 
   return (
     <main className='flex h-[100dvh] flex-col overflow-hidden bg-[#0a0a0a] text-zinc-100'>
