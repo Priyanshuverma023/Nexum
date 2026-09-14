@@ -43,7 +43,6 @@ function resolveEventTime(eventTime: string | undefined): {
 }
 
 export async function executeIntent(intent: ParsedIntent, tenantId: string) {
-  const client = getCorsair().withTenant(tenantId);
   const results: {
     emailSent?: boolean;
     eventCreated?: boolean;
@@ -52,13 +51,17 @@ export async function executeIntent(intent: ParsedIntent, tenantId: string) {
   } = {};
 
   try {
+    const client = getCorsair().withTenant(tenantId);
+
     if (intent.action === 'send_email' || intent.action === 'both') {
       const raw = buildRawEmail(
         intent.recipient || '',
         intent.subject || '(no subject)',
         intent.emailBody || '',
       );
+
       await client.gmail.api.messages.send({ raw });
+
       results.emailSent = true;
     }
 
@@ -68,11 +71,17 @@ export async function executeIntent(intent: ParsedIntent, tenantId: string) {
       await client.googlecalendar.api.events.create({
         event: {
           summary: intent.eventTitle || 'New event',
-          start: { dateTime: start.toISOString() },
-          end: { dateTime: end.toISOString() },
+          start: {
+            dateTime: start.toISOString(),
+          },
+          end: {
+            dateTime: end.toISOString(),
+          },
         },
       });
+
       results.eventCreated = true;
+
       results.scheduledFor = start.toLocaleString('en-IN', {
         dateStyle: 'medium',
         timeStyle: 'short',
@@ -80,7 +89,7 @@ export async function executeIntent(intent: ParsedIntent, tenantId: string) {
     }
   } catch (err) {
     console.error('Execution failed:', err);
-    results.error = String(err);
+    results.error = err instanceof Error ? err.message : String(err);
   }
 
   return results;

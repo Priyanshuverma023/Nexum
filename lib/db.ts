@@ -12,4 +12,4 @@ pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err);
 });
 
-export const db = drizzle(pool);
+export const db = drizzle(pool); 

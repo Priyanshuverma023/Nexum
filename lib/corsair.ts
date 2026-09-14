@@ -16,10 +16,7 @@ export function getCorsair() {
         projectApiKey: process.env.CORSAIR_DEV_API_KEY!,
         signingSecret: process.env.CORSAIR_DEV_SIGNING_SECRET!,
       },
-      plugins: [
-        gmail(),
-        googlecalendar(),
-      ],
+      plugins: [gmail(), googlecalendar()],
     });
   }
   return _corsair;
