@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@corsair-dev/cli':
-        specifier: ^0.1.20
-        version: 0.1.20(react@19.2.8)(supports-color@7.2.0)
       '@corsair-dev/github':
         specifier: ^0.1.18
         version: 0.1.18(corsair@0.1.120(react@19.2.8))(zod@4.4.3)
@@ -48,6 +45,9 @@ importers:
         specifier: 19.2.8
         version: 19.2.8(react@19.2.8)
     devDependencies:
+      '@corsair-dev/cli':
+        specifier: ^0.1.23
+        version: 0.1.23(react@19.2.8)(supports-color@7.2.0)
       '@tailwindcss/postcss':
         specifier: ^4
         version: 4.3.3
@@ -255,8 +255,8 @@ packages:
     resolution: {integrity: sha512-y7/yvZ2TPAnR9+jnc00klvNNLkJiXFFrQA/hlLCcxA9a2A4zQIOimyFQ9XfwYKiGD1fb5GY8vbKIIgO8d5Tb2A==}
     engines: {node: '>= 20.12.0'}
 
-  '@corsair-dev/cli@0.1.20':
-    resolution: {integrity: sha512-HsTSeCUPBzlTugV9u1u9etvPZ08p0iggmfh7Nw3WwwP45c8lAKHUIShLbK4y3G0nCvame1vZba6f5ip2itp6Hw==}
+  '@corsair-dev/cli@0.1.23':
+    resolution: {integrity: sha512-mpIYawmQuTziSTnnvamela6Ur58qmfkDkhOvnsSIt6U/AgiHSaKjSEalCTTYv6Fk5kz0QdIVvqSRaMwJ/wMKtg==}
     hasBin: true
 
   '@corsair-dev/frpc-darwin-arm64@0.1.117':
@@ -1620,16 +1620,16 @@ packages:
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
 
-  corsair@0.1.117:
-    resolution: {integrity: sha512-5tp8G50Npv58YttRhAYvMe4Ce16d2LOWSy6xBCuL7jgCotU9xanjvR64aE8m5nKbCZZ7sYFacbDz1NH2Gr82hw==}
+  corsair@0.1.120:
+    resolution: {integrity: sha512-tB6puTyUgiJFmJfsQxvyxd0D+HDw2XovtZ8p1m5oWPrHFsy+5PXWV3lm7KHFj5uqvvpwx3173kkCgx5R2VuKoA==}
     peerDependencies:
       react: '>=18.0.0'
     peerDependenciesMeta:
       react:
         optional: true
 
-  corsair@0.1.120:
-    resolution: {integrity: sha512-tB6puTyUgiJFmJfsQxvyxd0D+HDw2XovtZ8p1m5oWPrHFsy+5PXWV3lm7KHFj5uqvvpwx3173kkCgx5R2VuKoA==}
+  corsair@0.1.133:
+    resolution: {integrity: sha512-6f6NU8rKhs+qxn3z++bOI8jBtylVGbIYrzeNs0avbvT1Aoditu1kQvbF4k0l6tpN74Sl6qLpzNl+++c05sW80w==}
     peerDependencies:
       react: '>=18.0.0'
     peerDependenciesMeta:
@@ -3360,7 +3360,7 @@ snapshots:
       fast-wrap-ansi: 0.2.2
       sisteransi: 1.0.5
 
-  '@corsair-dev/cli@0.1.20(react@19.2.8)(supports-color@7.2.0)':
+  '@corsair-dev/cli@0.1.23(react@19.2.8)(supports-color@7.2.0)':
     dependencies:
       '@babel/core': 7.29.7(supports-color@7.2.0)
       '@babel/preset-react': 7.29.7(@babel/core@7.29.7(supports-color@7.2.0))(supports-color@7.2.0)
@@ -3368,7 +3368,7 @@ snapshots:
       '@clack/prompts': 1.7.0
       c12: 3.3.4
       commander: 14.0.3
-      corsair: 0.1.117(react@19.2.8)
+      corsair: 0.1.133(react@19.2.8)
       zod: 4.4.3
     transitivePeerDependencies:
       - magicast
@@ -4409,7 +4409,7 @@ snapshots:
 
   convert-source-map@2.0.0: {}
 
-  corsair@0.1.117(react@19.2.8):
+  corsair@0.1.120(react@19.2.8):
     dependencies:
       kysely: 0.28.17
       kysely-postgres-js: 3.0.0(kysely@0.28.17)
@@ -4426,7 +4426,7 @@ snapshots:
     transitivePeerDependencies:
       - postgres
 
-  corsair@0.1.120(react@19.2.8):
+  corsair@0.1.133(react@19.2.8):
     dependencies:
       kysely: 0.28.17
       kysely-postgres-js: 3.0.0(kysely@0.28.17)

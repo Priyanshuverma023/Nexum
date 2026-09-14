@@ -12,7 +12,6 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@corsair-dev/cli": "^0.1.20",
     "@corsair-dev/github": "^0.1.18",
     "@corsair-dev/gmail": "^0.1.5",
     "@corsair-dev/googlecalendar": "^0.1.6",
@@ -27,6 +26,7 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@corsair-dev/cli": "^0.1.23",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/pg": "^8.23.1",
